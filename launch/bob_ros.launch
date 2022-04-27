@@ -1,0 +1,14 @@
+<launch>
+    <node pkg="asti_prueba" name="motores_nodo" type="f_motor.py"/>
+    <node pkg="asti_prueba" name="ultrasonidos" type="f_Ultrasonidos.py"/>
+    <node pkg="asti_prueba" name="ldrs" type="f_LDRs.py"/>
+    <node pkg="asti_prueba" name="servo_pales" type="f_servoPales.py"/>
+</launch>
+<!--
+<launch>
+    <node pkg="pruebas" name="motores_nodo" type="f_motor.py"/>
+    <node pkg="pruebas" name="ultrasonidos" type="f_Ultrasonidos.py"/>
+    <node pkg="pruebas" name="ldrs" type="f_LDRs.py"/>
+    <node pkg="pruebas" name="servo_pales" type="f_servoPales.py"/>
+</launch>
+-->
