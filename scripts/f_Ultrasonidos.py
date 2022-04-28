@@ -10,11 +10,11 @@ except:
 
 pub = rospy.Publisher('Ultrasonidos_data', Int16MultiArray, queue_size=10)
 rospy.init_node('Ultrasonidos_node', anonymous=False)
-rate = rospy.Rate(1) # 10hz
+rate = rospy.Rate(10) # 10hz
 
-GPIO_USON = {"IZQ": [12,19],
+GPIO_USON = {"IZQ": [20,26],
             "CEN": [12,13],
-            "DER": [12,26]}
+            "DER": [16,19]}
 
 def publishUltrasonidos_data(ult_data):
     pub.publish(ult_data)
@@ -59,7 +59,12 @@ def main():
         print("empezando bucle")
         ult_array.data = []
         for key in GPIO_USON.keys():
-            distancia = int(medida(GPIO_USON[key]))
+            posibles_distancias = []
+            for _ in range(3):
+                d = int(medida(GPIO_USON[key]))
+                posibles_distancias.append(d)
+                time.sleep(0.01)
+            distancia = min(posibles_distancias)
             print("La distancia es:   ",distancia)
             ult_array.data.append(distancia)
             time.sleep(0.01)
@@ -80,12 +85,12 @@ def medida(uson_list):
     time.sleep(0.00001)
     GPIO.output(uson_list[0], False)
     start = time.time()
+    stop = start
     
     keep_going = True
 
     while GPIO.input(uson_list[1])==0 and keep_going:
         start = time.time()
-        print("start", start)
         if start - pre_launch > 1:
             keep_going = False
 
