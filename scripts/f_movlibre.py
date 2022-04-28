@@ -20,7 +20,11 @@ def main():
         "fl": "FL",
         "fr": "FR",
         "bl": "BL",
-        "br": "BR"
+        "br": "BR",
+        "fli": "FLi",
+        "fri": "FRi",
+        "bli": "BLi",
+        "bri": "BRi"
     }
     while not rospy.is_shutdown():
         select = str(raw_input("aa:\n"))

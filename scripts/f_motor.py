@@ -62,6 +62,14 @@ def callback(data):
         move_motor("BL", 0)
     elif orden == "BR":
         move_motor("BR", 0)
+    elif orden == "FLi":
+        move_motor("FL", 1)
+    elif orden == "FRi":
+        move_motor("FR", 1)
+    elif orden == "BLi":
+        move_motor("BL", 1)
+    elif orden == "BRi":
+        move_motor("BR", 1)
     elif orden == "stop":
         for key in MOTORES_DIC.keys():
             stop_motor(key)
@@ -86,7 +94,7 @@ def motores():
     p = GPIO.PWM(ENABLE, 50)  # Creamos la instancia PWM con el GPIO a utilizar y la frecuencia de la seÃ±al PWM
     p.start(0)
     GPIO.output(ENABLE,GPIO.HIGH)
-    p.ChangeDutyCycle(50)
+    p.ChangeDutyCycle(100)
 
     print("Fin config")
 

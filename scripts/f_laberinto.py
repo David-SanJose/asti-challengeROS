@@ -29,8 +29,8 @@ def main():
     #Se declara el subscriber de los ultrasonidos
     rospy.Subscriber('Ultrasonidos_data', Int16MultiArray, subsUltrasonidos)
 
-    limites_inf = [5,10,5]
-    limites_sup = [15]
+    limites_inf = [5,20,5]
+    limites_sup = [30]
     IZQ, CEN, DER = [0,1,2]
     #Entra al bucle de ROS
     while not rospy.is_shutdown():
