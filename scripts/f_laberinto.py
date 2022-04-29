@@ -16,6 +16,17 @@ UltrSoni2.data = []
 data = []
 registro = [0,0,0]
 
+# Estado en el que se encuentra el robot
+estadoAnt = "R"
+estado = "R"
+
+#Limites de distanciacon las paredes
+limites_inf = [15,20,5]
+limites_sup = [25]
+# Convenciones para CONSTANTES
+IZQ, CEN, DER = [0,1,2]
+INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE = [-1,0,1]
+
 def ordenDeMoviviento(movimiento_str):
     pub.publish(movimiento_str)
 
@@ -29,16 +40,18 @@ def subsUltrasonidos(array_data):
     data = UltrSoni2.data
     rospy.loginfo(rospy.get_caller_id()+" UltrSoni2 He recibido datos" + str(UltrSoni2.data[0]))
 
+def getEstadoDeRobotConParedIzq(data_fija):
+    if data_fija[IZQ] < limites_inf[IZQ]:
+        return INFERIOR_AL_LIMITE
+    elif data_fija[IZQ] > limites_sup[IZQ]:
+        return SUPERIOR_AL_LIMITE
+    else:
+        return CENTRADO_ENTRE_LIMITES
+
 def main():
     #Se declara el subscriber de los ultrasonidos
     rospy.Subscriber('Ultrasonidos_data', Int16MultiArray, subsUltrasonidos)
 
-    limites_inf = [15,20,5]
-    limites_sup = [25]
-    IZQ, CEN, DER = [0,1,2]
-
-    estadoAnt = "R"
-    estado = "R"
     
     #Entra al bucle de ROS
     while not rospy.is_shutdown():
@@ -49,15 +62,26 @@ def main():
         orden = "stop"
         print("REG. ",registro, "---  DATA: ",data)
 
+        data_fija = data
+
+        #Comprobacion distancia izq:
+        dist_estado_izq = getEstadoDeRobotConParedIzq(data_fija)
+
+        # Accion segun estado y cambio de estado
         if estado == "R":
-            if data[IZQ] > limites_inf[]
+            if dist_estado_izq == INFERIOR_AL_LIMITE:
+                estado = "CD"
+            elif dist_estado_izq == SUPERIOR_AL_LIMITE:
+                estado = "CD"
         elif estado == "CI":
-            pass
+            if dist_estado_izq == CENTRADO_ENTRE_LIMITES:
+                estado = "R"
         elif estado == "CD":
-            pass
+            if dist_estado_izq == CENTRADO_ENTRE_LIMITES:
+                estado = "R"
 
         estadoAnt = estado
-
+        print("ESTADO ACTUAL: ", estado, "   --- DIST: ", data_fija[IZQ])
 
         #Seguir pared de izquierda
 
