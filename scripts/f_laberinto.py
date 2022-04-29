@@ -37,6 +37,8 @@ def main():
     limites_sup = [25]
     IZQ, CEN, DER = [0,1,2]
 
+    estadoAnt = "R"
+    estado = "R"
     
     #Entra al bucle de ROS
     while not rospy.is_shutdown():
@@ -46,7 +48,20 @@ def main():
         ### AQUI EL CODIGO ###
         orden = "stop"
         print("REG. ",registro, "---  DATA: ",data)
+
+        if estado == "R":
+            if data[IZQ] > limites_inf[]
+        elif estado == "CI":
+            pass
+        elif estado == "CD":
+            pass
+
+        estadoAnt = estado
+
+
         #Seguir pared de izquierda
+
+        '''
         if len(data) == 3:
             if data[IZQ] <= limites_inf[IZQ]:
                 if registro[IZQ] >= data[IZQ]:
@@ -76,7 +91,7 @@ def main():
             else:
                 ordenDeMoviviento("avanza")
 
-
+        '''
 
         ''' Prueba 1
         if len(data) == 3:
