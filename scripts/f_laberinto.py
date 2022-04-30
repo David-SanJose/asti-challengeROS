@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from this import d
 import rospy
 from std_msgs.msg import String
 from std_msgs.msg import Int16MultiArray
@@ -8,24 +9,31 @@ import time
 
 pub = rospy.Publisher('orden_mov', String, queue_size=10)
 rospy.init_node('laberinto', anonymous=False)
-rate = rospy.Rate(1) # 10hz
+rate = rospy.Rate(10) # 10hz
 
 ldrs = Ldrs()
 UltrSoni2 = Int16MultiArray()
 UltrSoni2.data = []
 data = []
-registro = [0,0,0]
 
-# Estado en el que se encuentra el robot
-estadoAnt = "R"
-estado = "R"
 
 #Limites de distanciacon las paredes
 limites_inf = [15,20,5]
 limites_sup = [25]
+MAX_LIMITE_EXTREMO = 80
+#Contador de ciclos que lleva corrigiendo
+contador_ciclos_correcion = 0
+contador_ciclos_reconocimiento = 0
 # Convenciones para CONSTANTES
 IZQ, CEN, DER = [0,1,2]
-INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE = [-1,0,1]
+INDETERMINADO, INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE, EXTREMO_LEJANO_AL_LIMITE = [-99,-1,0,1, 99]
+#LISTADO DE ESTADOS
+ESTADO_INDETERMINADO, ESTADO_AVANZAR, ESTADO_CORREGIR_IZQ, ESTADO_CORREGIR_DER = ["I","R", "CI", "CD"]
+ESTADO_PRE_C_IZQ, ESTADO_PRE_C_DER, ESTADO_RECONOCIMIENTO = ["P_CI", "P_CD", "REC"]
+#ACCIONES
+A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP = ["avanza", "gizq", "gder", "atras", "stop"]
+# Lista de acciones segun el ciclo de reconocimiento
+LISTA_A_RECONOCIMIENTO = [A_STOP, A_GIRO_IZQ, A_GIRO_IZQ, A_GIRO_DER, A_GIRO_DER, A_GIRO_DER, A_GIRO_DER, A_GIRO_IZQ, A_GIRO_IZQ]
 
 def ordenDeMoviviento(movimiento_str):
     pub.publish(movimiento_str)
@@ -33,55 +41,152 @@ def ordenDeMoviviento(movimiento_str):
 def subsUltrasonidos(array_data):
     global UltrSoni2
     global data
-    global registro
 
     UltrSoni2 = array_data
-    registro = data
     data = UltrSoni2.data
-    rospy.loginfo(rospy.get_caller_id()+" UltrSoni2 He recibido datos" + str(UltrSoni2.data[0]))
+    #rospy.loginfo(rospy.get_caller_id()+" UltrSoni2 He recibido datos" + str(UltrSoni2.data[0]))
 
 def getEstadoDeRobotConParedIzq(data_fija):
-    if data_fija[IZQ] < limites_inf[IZQ]:
-        return INFERIOR_AL_LIMITE
-    elif data_fija[IZQ] > limites_sup[IZQ]:
-        return SUPERIOR_AL_LIMITE
+    
+    if len(data_fija):
+        if data_fija[IZQ] >= MAX_LIMITE_EXTREMO:
+            return EXTREMO_LEJANO_AL_LIMITE
+        elif data_fija[IZQ] < limites_inf[IZQ]:
+            return INFERIOR_AL_LIMITE
+        elif data_fija[IZQ] > limites_sup[IZQ]:
+            return SUPERIOR_AL_LIMITE
+        else:
+            return CENTRADO_ENTRE_LIMITES
     else:
-        return CENTRADO_ENTRE_LIMITES
+        return INDETERMINADO
+
+def accionSegunEstado(estado):
+    if estado == ESTADO_AVANZAR:
+        ordenDeMoviviento(A_AVANZAR)
+    elif estado == ESTADO_PRE_C_IZQ:
+        ordenDeMoviviento(A_GIRO_IZQ)
+        time.sleep(0.4)
+    elif estado == ESTADO_PRE_C_DER:
+        ordenDeMoviviento(A_GIRO_DER)
+        time.sleep(0.4)
+    elif estado == ESTADO_CORREGIR_IZQ:
+        ordenDeMoviviento(A_AVANZAR)
+    elif estado == ESTADO_CORREGIR_DER:
+        ordenDeMoviviento(A_AVANZAR)
+    elif estado == ESTADO_INDETERMINADO:
+        ordenDeMoviviento(A_STOP)
+    elif estado == ESTADO_RECONOCIMIENTO:
+        ordenRec = LISTA_A_RECONOCIMIENTO[contador_ciclos_reconocimiento]
+        ordenDeMoviviento(ordenRec)
+        time.sleep(0.3)
+        ordenDeMoviviento(A_STOP)
+        time.sleep(1)
+
+    else:
+        ordenDeMoviviento(A_STOP)
+  
+    
+
+def cambiarDeEstado(estado, estado_pared_izq):
+    global contador_ciclos_correcion
+    global contador_ciclos_reconocimiento
+    maximo_cont_correcion = 20
+
+    if estado != ESTADO_RECONOCIMIENTO and estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE: #EN CASO DE ALEJARSE MUCHO, ENTRA EN RECONOCIMIENTO
+        return ESTADO_RECONOCIMIENTO
+
+    elif estado == ESTADO_AVANZAR:
+        if estado_pared_izq == INFERIOR_AL_LIMITE:
+            return ESTADO_PRE_C_DER
+        elif estado_pared_izq == SUPERIOR_AL_LIMITE:
+            return ESTADO_PRE_C_IZQ
+
+    elif estado == ESTADO_PRE_C_IZQ:
+        return ESTADO_CORREGIR_IZQ
+
+    elif estado == ESTADO_PRE_C_DER:
+        return ESTADO_CORREGIR_DER
+
+    elif estado == ESTADO_CORREGIR_IZQ:
+        if estado_pared_izq == CENTRADO_ENTRE_LIMITES:
+            return ESTADO_AVANZAR
+        elif estado_pared_izq == INFERIOR_AL_LIMITE:
+            return ESTADO_PRE_C_DER
+        elif contador_ciclos_correcion >= maximo_cont_correcion:
+            contador_ciclos_correcion = 0
+            return ESTADO_PRE_C_IZQ
+
+    elif estado == ESTADO_CORREGIR_DER:
+        if estado_pared_izq == CENTRADO_ENTRE_LIMITES:
+            return ESTADO_AVANZAR
+        elif estado_pared_izq == SUPERIOR_AL_LIMITE:
+            return ESTADO_PRE_C_IZQ
+        elif contador_ciclos_correcion >= maximo_cont_correcion:
+            contador_ciclos_correcion = 0
+            return ESTADO_PRE_C_DER
+    
+    elif estado == ESTADO_INDETERMINADO:
+        if estado_pared_izq == INFERIOR_AL_LIMITE:
+            return ESTADO_PRE_C_DER
+        elif estado_pared_izq == SUPERIOR_AL_LIMITE:
+            return ESTADO_PRE_C_IZQ
+        elif estado_pared_izq == CENTRADO_ENTRE_LIMITES:
+            return ESTADO_AVANZAR
+
+    elif estado == ESTADO_RECONOCIMIENTO:
+        if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
+            contador_ciclos_reconocimiento = 0
+            return ESTADO_INDETERMINADO
+        if contador_ciclos_reconocimiento < len(LISTA_A_RECONOCIMIENTO) -1:
+            contador_ciclos_reconocimiento += 1
+            return estado
+        else:
+            contador_ciclos_reconocimiento = 0
+            print("\n\nSE ACABARON LOS CICLOS DE RECONOCIMIENTO\n")
+            return ESTADO_INDETERMINADO #TODO CAMBIAR A ESTADO DE GIRO PARED
+
+    return estado
+
+
 
 def main():
     #Se declara el subscriber de los ultrasonidos
     rospy.Subscriber('Ultrasonidos_data', Int16MultiArray, subsUltrasonidos)
-
+    # Estado en el que se encuentra el robot
+    estadoAnt = ESTADO_INDETERMINADO
+    estado = ESTADO_INDETERMINADO
+    
     
     #Entra al bucle de ROS
     while not rospy.is_shutdown():
         global data
+        global contador_ciclos_correcion
+        
         
         ######################
         ### AQUI EL CODIGO ###
-        orden = "stop"
-        print("REG. ",registro, "---  DATA: ",data)
+        print("---  DATA: ",data)
 
         data_fija = data
 
         #Comprobacion distancia izq:
         dist_estado_izq = getEstadoDeRobotConParedIzq(data_fija)
 
-        # Accion segun estado y cambio de estado
-        if estado == "R":
-            if dist_estado_izq == INFERIOR_AL_LIMITE:
-                estado = "CD"
-            elif dist_estado_izq == SUPERIOR_AL_LIMITE:
-                estado = "CD"
-        elif estado == "CI":
-            if dist_estado_izq == CENTRADO_ENTRE_LIMITES:
-                estado = "R"
-        elif estado == "CD":
-            if dist_estado_izq == CENTRADO_ENTRE_LIMITES:
-                estado = "R"
+        #Accion segun estado
+        accionSegunEstado(estado)
+        # cambio de estado
+        estado = cambiarDeEstado(estado, dist_estado_izq)
 
-        estadoAnt = estado
-        print("ESTADO ACTUAL: ", estado, "   --- DIST: ", data_fija[IZQ])
+        #Incrementar numero de ciclos que lleva corrigiendo a la IZQ el robot
+        if estado == ESTADO_CORREGIR_IZQ or estado == ESTADO_CORREGIR_DER:
+            contador_ciclos_correcion += 1
+        else:
+            contador_ciclos_correcion = 0
+
+        try:
+            print("ESTADO ACTUAL: ", estado, "   --- DIST: ", data_fija[IZQ])
+        except:
+            print("ESTADO ACTUAL: ", estado)
 
         #Seguir pared de izquierda
 
