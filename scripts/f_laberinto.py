@@ -30,11 +30,12 @@ INDETERMINADO, INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE, E
 #LISTADO DE ESTADOS
 ESTADO_INDETERMINADO, ESTADO_AVANZAR, ESTADO_CORREGIR_IZQ, ESTADO_CORREGIR_DER = ["I","R", "CI", "CD"]
 ESTADO_PRE_C_IZQ, ESTADO_PRE_C_DER, ESTADO_RECONOCIMIENTO, ESTADO_POST_RECON = ["P_CI", "P_CD", "REC", "POST-REC"]
+ESTADO_FIND_PIZQ_AVANZA, ESTADO_FIND_PIZQ_GIRO = ["FP-IZQ-A", "FP-IZQ-G"]
 #ACCIONES
 A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP = ["avanza", "gizq", "gder", "atras", "stop"]
 # Lista de acciones segun el ciclo de reconocimiento
 LISTA_A_RECONOCIMIENTO = [A_STOP, A_GIRO_IZQ, A_GIRO_IZQ, A_GIRO_DER, A_GIRO_DER,
- A_GIRO_DER, A_GIRO_DER, A_GIRO_IZQ, A_GIRO_IZQ, A_AVANZAR]
+ A_GIRO_DER, A_GIRO_DER, A_GIRO_IZQ, A_GIRO_IZQ]
 
 def ordenDeMoviviento(movimiento_str):
     pub.publish(movimiento_str)
@@ -84,6 +85,16 @@ def accionSegunEstado(estado):
         time.sleep(0.8)
     elif estado == ESTADO_POST_RECON:
         ordenDeMoviviento(A_STOP)
+    elif estado == ESTADO_FIND_PIZQ_AVANZA:
+        ordenDeMoviviento(A_AVANZAR)
+        time.sleep(1)
+        ordenDeMoviviento(A_STOP)
+        time.sleep(1)
+    elif estado == ESTADO_FIND_PIZQ_GIRO:
+        ordenDeMoviviento(A_GIRO_IZQ)
+        time.sleep(0.3)
+        ordenDeMoviviento(A_STOP)
+        time.sleep(1)
     else:
         ordenDeMoviviento(A_STOP)
   
@@ -96,6 +107,8 @@ def cambiarDeEstado(estado, estado_pared_izq):
 
     if (estado != ESTADO_RECONOCIMIENTO and
         estado != ESTADO_POST_RECON and
+        estado != ESTADO_FIND_PIZQ_AVANZA and
+        estado != ESTADO_FIND_PIZQ_GIRO and
         estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE): #EN CASO DE ALEJARSE MUCHO, ENTRA EN RECONOCIMIENTO
         return ESTADO_RECONOCIMIENTO
 
@@ -139,7 +152,7 @@ def cambiarDeEstado(estado, estado_pared_izq):
 
     elif estado == ESTADO_RECONOCIMIENTO:
         print("CICLOS RECON:", contador_ciclos_reconocimiento)
-        if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
+        if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE: #TODO Resolver out of range
             contador_ciclos_reconocimiento += 1
             print("      REC -> AVANZAR")
             return ESTADO_POST_RECON
@@ -149,7 +162,7 @@ def cambiarDeEstado(estado, estado_pared_izq):
         else:
             contador_ciclos_reconocimiento = 0
             print("\n\nSE ACABARON LOS CICLOS DE RECONOCIMIENTO\n")
-            return ESTADO_INDETERMINADO #TODO CAMBIAR A ESTADO DE GIRO PARED
+            return ESTADO_FIND_PIZQ_AVANZA #Si se acaban los ciclos de recon sin encontrar nada, gira la pared
 
     elif estado == ESTADO_POST_RECON:
         if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
@@ -157,6 +170,17 @@ def cambiarDeEstado(estado, estado_pared_izq):
             return ESTADO_INDETERMINADO
         else:
             return ESTADO_RECONOCIMIENTO
+
+    elif estado == ESTADO_FIND_PIZQ_AVANZA:
+        if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
+            return ESTADO_FIND_PIZQ_GIRO
+        else:
+            return ESTADO_INDETERMINADO
+    elif estado == ESTADO_FIND_PIZQ_GIRO:
+        if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
+            return ESTADO_FIND_PIZQ_AVANZA
+        else:
+            return ESTADO_INDETERMINADO
 
     return estado
 
