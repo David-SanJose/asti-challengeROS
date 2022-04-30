@@ -30,7 +30,7 @@ INDETERMINADO, INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE, E
 #LISTADO DE ESTADOS
 ESTADO_INDETERMINADO, ESTADO_AVANZAR, ESTADO_CORREGIR_IZQ, ESTADO_CORREGIR_DER = ["I","R", "CI", "CD"]
 ESTADO_PRE_C_IZQ, ESTADO_PRE_C_DER, ESTADO_RECONOCIMIENTO, ESTADO_POST_RECON = ["P_CI", "P_CD", "REC", "POST-REC"]
-ESTADO_FIND_PIZQ_AVANZA, ESTADO_FIND_PIZQ_GIRO = ["FP-IZQ-A", "FP-IZQ-G"]
+ESTADO_FIND_PIZQ_AVANZA, ESTADO_FIND_PIZQ_GIRO, ESTADO_POST_FPIZQ_AV, ESTADO_POST_FPIZQ_GI,  = ["FP-IZQ-A", "FP-IZQ-G", "POST-FP-IZQ-A", "POST-FP-IZQ-G"]
 #ACCIONES
 A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP = ["avanza", "gizq", "gder", "atras", "stop"]
 # Lista de acciones segun el ciclo de reconocimiento
@@ -65,36 +65,54 @@ def getEstadoDeRobotConParedIzq(data_fija):
 def accionSegunEstado(estado):
     if estado == ESTADO_AVANZAR:
         ordenDeMoviviento(A_AVANZAR)
+
     elif estado == ESTADO_PRE_C_IZQ:
         ordenDeMoviviento(A_GIRO_IZQ)
         time.sleep(0.4)
+
     elif estado == ESTADO_PRE_C_DER:
         ordenDeMoviviento(A_GIRO_DER)
         time.sleep(0.4)
+
     elif estado == ESTADO_CORREGIR_IZQ:
         ordenDeMoviviento(A_AVANZAR)
+
     elif estado == ESTADO_CORREGIR_DER:
         ordenDeMoviviento(A_AVANZAR)
+
     elif estado == ESTADO_INDETERMINADO:
         ordenDeMoviviento(A_STOP)
+
     elif estado == ESTADO_RECONOCIMIENTO:
         ordenRec = LISTA_A_RECONOCIMIENTO[contador_ciclos_reconocimiento]
         ordenDeMoviviento(ordenRec)
-        time.sleep(0.3)
+        time.sleep(0.5)
         ordenDeMoviviento(A_STOP)
         time.sleep(0.8)
+
     elif estado == ESTADO_POST_RECON:
         ordenDeMoviviento(A_STOP)
+
     elif estado == ESTADO_FIND_PIZQ_AVANZA:
         ordenDeMoviviento(A_AVANZAR)
         time.sleep(1)
         ordenDeMoviviento(A_STOP)
         time.sleep(1)
+
     elif estado == ESTADO_FIND_PIZQ_GIRO:
         ordenDeMoviviento(A_GIRO_IZQ)
-        time.sleep(0.3)
+        time.sleep(0.5)
         ordenDeMoviviento(A_STOP)
         time.sleep(1)
+
+    elif estado == ESTADO_POST_FPIZQ_AV:
+        ordenDeMoviviento(A_STOP)
+        time.sleep(0.1)
+    
+    elif estado == ESTADO_POST_FPIZQ_GI:
+        ordenDeMoviviento(A_STOP)
+        time.sleep(0.1)
+
     else:
         ordenDeMoviviento(A_STOP)
   
@@ -109,6 +127,8 @@ def cambiarDeEstado(estado, estado_pared_izq):
         estado != ESTADO_POST_RECON and
         estado != ESTADO_FIND_PIZQ_AVANZA and
         estado != ESTADO_FIND_PIZQ_GIRO and
+        estado != ESTADO_POST_FPIZQ_AV and
+        estado != ESTADO_POST_FPIZQ_GI and
         estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE): #EN CASO DE ALEJARSE MUCHO, ENTRA EN RECONOCIMIENTO
         return ESTADO_RECONOCIMIENTO
 
@@ -151,8 +171,8 @@ def cambiarDeEstado(estado, estado_pared_izq):
             return ESTADO_AVANZAR
 
     elif estado == ESTADO_RECONOCIMIENTO:
-        print("CICLOS RECON:", contador_ciclos_reconocimiento)
-        if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE: #TODO Resolver out of range
+        #print("CICLOS RECON:", contador_ciclos_reconocimiento)
+        if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
             contador_ciclos_reconocimiento += 1
             print("      REC -> AVANZAR")
             return ESTADO_POST_RECON
@@ -162,25 +182,43 @@ def cambiarDeEstado(estado, estado_pared_izq):
         else:
             contador_ciclos_reconocimiento = 0
             print("\n\nSE ACABARON LOS CICLOS DE RECONOCIMIENTO\n")
-            return ESTADO_FIND_PIZQ_AVANZA #Si se acaban los ciclos de recon sin encontrar nada, gira la pared
+            return ESTADO_FIND_PIZQ_GIRO #Si se acaban los ciclos de recon sin encontrar nada, gira la pared
 
     elif estado == ESTADO_POST_RECON:
         if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
             contador_ciclos_reconocimiento = 0
             return ESTADO_INDETERMINADO
         else:
-            return ESTADO_RECONOCIMIENTO
+            if contador_ciclos_reconocimiento >= len(LISTA_A_RECONOCIMIENTO):
+                contador_ciclos_reconocimiento = 0
+                print("\n\nSE ACABARON LOS CICLOS DE RECONOCIMIENTO\n")
+                return ESTADO_FIND_PIZQ_GIRO #Si se acaban los ciclos de recon sin encontrar nada, gira la pared
+            else:
+                return ESTADO_RECONOCIMIENTO
 
     elif estado == ESTADO_FIND_PIZQ_AVANZA:
         if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
-            return ESTADO_FIND_PIZQ_GIRO
-        else:
-            return ESTADO_INDETERMINADO
+            if data[IZQ] > MAX_LIMITE_EXTREMO: #Doble check
+                return ESTADO_FIND_PIZQ_GIRO 
+        return ESTADO_POST_FPIZQ_AV
+
     elif estado == ESTADO_FIND_PIZQ_GIRO:
         if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
-            return ESTADO_FIND_PIZQ_AVANZA
-        else:
+            if data[IZQ] > MAX_LIMITE_EXTREMO: #Doble check
+                return ESTADO_FIND_PIZQ_AVANZA
+        return ESTADO_POST_FPIZQ_GI
+
+    elif estado == ESTADO_POST_FPIZQ_AV:
+        if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
             return ESTADO_INDETERMINADO
+        else:
+            return ESTADO_FIND_PIZQ_GIRO
+
+    elif estado == ESTADO_POST_FPIZQ_GI:
+        if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
+            return ESTADO_INDETERMINADO
+        else:
+            return ESTADO_FIND_PIZQ_AVANZA
 
     return estado
 
