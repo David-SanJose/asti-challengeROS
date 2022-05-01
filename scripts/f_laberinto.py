@@ -88,22 +88,22 @@ def accionSegunEstado(estado):
         ordenDeMoviviento(ordenRec)
         time.sleep(0.5)
         ordenDeMoviviento(A_STOP)
-        time.sleep(0.8)
+        time.sleep(0.2)
 
     elif estado == ESTADO_POST_RECON:
         ordenDeMoviviento(A_STOP)
 
     elif estado == ESTADO_FIND_PIZQ_AVANZA:
         ordenDeMoviviento(A_AVANZAR)
-        time.sleep(1)
+        time.sleep(2)
         ordenDeMoviviento(A_STOP)
-        time.sleep(1)
+        time.sleep(0.3)
 
     elif estado == ESTADO_FIND_PIZQ_GIRO:
         ordenDeMoviviento(A_GIRO_IZQ)
         time.sleep(0.5)
         ordenDeMoviviento(A_STOP)
-        time.sleep(1)
+        time.sleep(0.3)
 
     elif estado == ESTADO_POST_FPIZQ_AV:
         ordenDeMoviviento(A_STOP)
@@ -126,7 +126,7 @@ def cambiarDeEstado(estado, estado_pared_izq):
     if (estado != ESTADO_RECONOCIMIENTO and
         estado != ESTADO_POST_RECON and
         estado != ESTADO_FIND_PIZQ_AVANZA and
-        estado != ESTADO_FIND_PIZQ_GIRO and
+        estado != ESTADO_FIND_PIZQ_GIRO and 
         estado != ESTADO_POST_FPIZQ_AV and
         estado != ESTADO_POST_FPIZQ_GI and
         estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE): #EN CASO DE ALEJARSE MUCHO, ENTRA EN RECONOCIMIENTO
@@ -198,13 +198,11 @@ def cambiarDeEstado(estado, estado_pared_izq):
 
     elif estado == ESTADO_FIND_PIZQ_AVANZA:
         if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
-            if data[IZQ] > MAX_LIMITE_EXTREMO: #Doble check
-                return ESTADO_FIND_PIZQ_GIRO 
+                return ESTADO_RECONOCIMIENTO 
         return ESTADO_POST_FPIZQ_AV
 
     elif estado == ESTADO_FIND_PIZQ_GIRO:
         if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
-            if data[IZQ] > MAX_LIMITE_EXTREMO: #Doble check
                 return ESTADO_FIND_PIZQ_AVANZA
         return ESTADO_POST_FPIZQ_GI
 
@@ -212,7 +210,7 @@ def cambiarDeEstado(estado, estado_pared_izq):
         if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
             return ESTADO_INDETERMINADO
         else:
-            return ESTADO_FIND_PIZQ_GIRO
+            return ESTADO_RECONOCIMIENTO
 
     elif estado == ESTADO_POST_FPIZQ_GI:
         if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
