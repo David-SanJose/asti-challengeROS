@@ -18,7 +18,7 @@ data = []
 
 
 #Limites de distanciacon las paredes
-limites_inf = [15,20,5]
+limites_inf = [15,20,10]
 limites_sup = [25]
 MAX_LIMITE_EXTREMO = 40
 #Contador de ciclos que lleva corrigiendo
@@ -31,6 +31,7 @@ INDETERMINADO, INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE, E
 ESTADO_INDETERMINADO, ESTADO_AVANZAR, ESTADO_CORREGIR_IZQ, ESTADO_CORREGIR_DER = ["I","R", "CI", "CD"]
 ESTADO_PRE_C_IZQ, ESTADO_PRE_C_DER, ESTADO_RECONOCIMIENTO, ESTADO_POST_RECON = ["P_CI", "P_CD", "REC", "POST-REC"]
 ESTADO_FIND_PIZQ_AVANZA, ESTADO_FIND_PIZQ_GIRO, ESTADO_POST_FPIZQ_AV, ESTADO_POST_FPIZQ_GI,  = ["FP-IZQ-A", "FP-IZQ-G", "POST-FP-IZQ-A", "POST-FP-IZQ-G"]
+ESTADO_GIRO_DER = ["GD"]
 #ACCIONES
 A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP = ["avanza", "gizq", "gder", "atras", "stop"]
 # Lista de acciones segun el ciclo de reconocimiento
@@ -48,8 +49,7 @@ def subsUltrasonidos(array_data):
     data = UltrSoni2.data
     #rospy.loginfo(rospy.get_caller_id()+" UltrSoni2 He recibido datos" + str(UltrSoni2.data[0]))
 
-def getEstadoDeRobotConParedIzq(data_fija):
-    
+def getEstadoDePosicionConParedIzq(data_fija):
     if len(data_fija):
         if data_fija[IZQ] >= MAX_LIMITE_EXTREMO:
             return EXTREMO_LEJANO_AL_LIMITE
@@ -57,6 +57,15 @@ def getEstadoDeRobotConParedIzq(data_fija):
             return INFERIOR_AL_LIMITE
         elif data_fija[IZQ] > limites_sup[IZQ]:
             return SUPERIOR_AL_LIMITE
+        else:
+            return CENTRADO_ENTRE_LIMITES
+    else:
+        return INDETERMINADO
+
+def getEstadoSimpleDePosicionConParedParametro(data_fija, sensor):
+    if len(data_fija):
+        if data_fija[sensor] < limites_inf[sensor]:
+            return INFERIOR_AL_LIMITE
         else:
             return CENTRADO_ENTRE_LIMITES
     else:
@@ -113,16 +122,40 @@ def accionSegunEstado(estado):
         ordenDeMoviviento(A_STOP)
         time.sleep(0.1)
 
+    elif estado == ESTADO_GIRO_DER:
+        print("> GIRANDO A LA DERECHA")
+        ordenDeMoviviento(A_STOP)
+        time.sleep(1)
+        ordenDeMoviviento(A_GIRO_DER)
+        time.sleep(2)
+
+
     else:
         ordenDeMoviviento(A_STOP)
   
     
 
-def cambiarDeEstado(estado, estado_pared_izq):
+def cambiarDeEstado(estado, lista_estados_pared):
     global contador_ciclos_correcion
     global contador_ciclos_reconocimiento
     maximo_cont_correcion = 20
 
+    estado_pared_izq = lista_estados_pared[0]
+    estado_pared_cen = lista_estados_pared[1]
+    estado_pared_der = lista_estados_pared[2]
+
+    # ---------CAMBIOS DE ESTADO SEGUN PARED CEN----------
+    if estado_pared_cen == INFERIOR_AL_LIMITE:
+        if (estado == ESTADO_AVANZAR or
+            estado == ESTADO_CORREGIR_DER or
+            estado == ESTADO_CORREGIR_IZQ
+        ):
+            return ESTADO_GIRO_DER
+    
+    if estado == ESTADO_GIRO_DER:
+        return ESTADO_INDETERMINADO
+
+    # ---------CAMBIOS DE ESTADO SEGUN PARED IZQ----------
     if (estado != ESTADO_RECONOCIMIENTO and
         estado != ESTADO_POST_RECON and
         estado != ESTADO_FIND_PIZQ_AVANZA and
@@ -243,12 +276,14 @@ def main():
         data_fija = data
 
         #Comprobacion distancia izq:
-        dist_estado_izq = getEstadoDeRobotConParedIzq(data_fija)
+        dist_estado_izq = getEstadoDePosicionConParedIzq(data_fija)
+        dist_estado_cen = getEstadoSimpleDePosicionConParedParametro(data_fija, CEN)
+        dist_estado_der = getEstadoSimpleDePosicionConParedParametro(data_fija, DER)
 
         #Accion segun estado
         accionSegunEstado(estado)
         # cambio de estado
-        estado = cambiarDeEstado(estado, dist_estado_izq)
+        estado = cambiarDeEstado(estado, [dist_estado_izq, dist_estado_cen, dist_estado_der])
 
         #Incrementar numero de ciclos que lleva corrigiendo a la IZQ el robot
         if estado == ESTADO_CORREGIR_IZQ or estado == ESTADO_CORREGIR_DER:
