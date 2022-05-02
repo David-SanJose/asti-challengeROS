@@ -127,7 +127,7 @@ def accionSegunEstado(estado):
         ordenDeMoviviento(A_STOP)
         time.sleep(1)
         ordenDeMoviviento(A_GIRO_DER)
-        time.sleep(2)
+        time.sleep(1.8)
 
 
     else:
@@ -138,7 +138,8 @@ def accionSegunEstado(estado):
 def cambiarDeEstado(estado, lista_estados_pared):
     global contador_ciclos_correcion
     global contador_ciclos_reconocimiento
-    maximo_cont_correcion = 20
+    maximo_cont_correcionIZQ = 20
+    maximo_cont_correcionDER = 10
 
     estado_pared_izq = lista_estados_pared[0]
     estado_pared_cen = lista_estados_pared[1]
@@ -182,7 +183,7 @@ def cambiarDeEstado(estado, lista_estados_pared):
             return ESTADO_AVANZAR
         elif estado_pared_izq == INFERIOR_AL_LIMITE:
             return ESTADO_PRE_C_DER
-        elif contador_ciclos_correcion >= maximo_cont_correcion:
+        elif contador_ciclos_correcion >= maximo_cont_correcionIZQ:
             contador_ciclos_correcion = 0
             return ESTADO_PRE_C_IZQ
 
@@ -191,7 +192,7 @@ def cambiarDeEstado(estado, lista_estados_pared):
             return ESTADO_AVANZAR
         elif estado_pared_izq == SUPERIOR_AL_LIMITE:
             return ESTADO_PRE_C_IZQ
-        elif contador_ciclos_correcion >= maximo_cont_correcion:
+        elif contador_ciclos_correcion >= maximo_cont_correcionDER:
             contador_ciclos_correcion = 0
             return ESTADO_PRE_C_DER
     
