@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from select import select
+from this import d
 import rospy
 from std_msgs.msg import String
 import time
@@ -24,7 +25,11 @@ def main():
         "fli": "FLi",
         "fri": "FRi",
         "bli": "BLi",
-        "bri": "BRi"
+        "bri": "BRi",
+        "1": "VEL 50",
+        "2": "VEL 70",
+        "3": "VEL 100",
+        "vel": "VEL"
     }
     while not rospy.is_shutdown():
         select = str(raw_input("aa:\n"))

@@ -15,6 +15,8 @@ MOTORES_DIC = {
 }
 ENABLE = 18
 
+p = None
+
 def move_motor(motor, reverse):
     global MOTORES_DIC
     GPIO.output(MOTORES_DIC[motor][0], not reverse)
@@ -44,12 +46,12 @@ def callback(data):
         move_motor("FR", 1)
         move_motor("BL", 0)
         move_motor("BR", 1)
-    elif orden == "mizq":
+    elif orden == "mder":
         move_motor("FL", 0)
         move_motor("FR", 1)
         move_motor("BL", 1)
         move_motor("BR", 0)
-    elif orden == "mder":
+    elif orden == "mizq":
         move_motor("FL", 1)
         move_motor("FR", 0)
         move_motor("BL", 0)
@@ -70,6 +72,25 @@ def callback(data):
         move_motor("BL", 1)
     elif orden == "BRi":
         move_motor("BR", 1)
+    #Control de velocidades
+    elif "VEL" in orden :
+        tmp = orden.split()
+        if tmp[1] == "lento":
+            p.ChangeDutyCycle(30)
+        elif tmp[1] == "medio":
+            p.ChangeDutyCycle(50)
+        elif tmp[1] == "rapido":
+            p.ChangeDutyCycle(100)
+        else:
+            try:
+                numero = int(tmp[1])
+                p.ChangeDutyCycle(numero)
+            except:
+                print("ERROR con el valor")
+
+
+
+
     elif orden == "stop":
         for key in MOTORES_DIC.keys():
             stop_motor(key)
@@ -80,6 +101,7 @@ def callback(data):
 def motores():
     global MOTORES_DIC
     global ENABLE
+    global p
 
     GPIO.setmode(GPIO.BCM)
     print("Comenzar config")

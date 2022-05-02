@@ -33,7 +33,7 @@ ESTADO_RECONOCIMIENTO, ESTADO_POST_RECON = [ "REC", "POST-REC"]
 ESTADO_FIND_PIZQ_AVANZA, ESTADO_FIND_PIZQ_GIRO, ESTADO_POST_FPIZQ_AV, ESTADO_POST_FPIZQ_GI,  = ["FP-IZQ-A", "FP-IZQ-G", "POST-FP-IZQ-A", "POST-FP-IZQ-G"]
 ESTADO_GIRO_DER = ["GD"]
 #ACCIONES
-A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP, A_MOV_IZQ, A_MOV_DER = ["avanza", "gizq", "gder", "atras", "stop", "mder", "mizq"]
+A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP, A_MOV_IZQ, A_MOV_DER = ["avanza", "gizq", "gder", "atras", "stop", "mizq", "mder"]
 # Lista de acciones segun el ciclo de reconocimiento
 LISTA_A_RECONOCIMIENTO = [A_STOP, A_GIRO_IZQ, A_GIRO_IZQ, A_GIRO_DER, A_GIRO_DER,
  A_GIRO_DER, A_GIRO_DER, A_GIRO_IZQ, A_GIRO_IZQ]
