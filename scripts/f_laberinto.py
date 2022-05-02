@@ -18,7 +18,7 @@ data = []
 
 
 #Limites de distanciacon las paredes
-limites_inf = [15,20,10]
+limites_inf = [15,20, 8]
 limites_sup = [25]
 MAX_LIMITE_EXTREMO = 40
 #Contador de ciclos que lleva corrigiendo
@@ -29,11 +29,11 @@ IZQ, CEN, DER = [0,1,2]
 INDETERMINADO, INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE, EXTREMO_LEJANO_AL_LIMITE = [-99,-1,0,1, 99]
 #LISTADO DE ESTADOS
 ESTADO_INDETERMINADO, ESTADO_AVANZAR, ESTADO_CORREGIR_IZQ, ESTADO_CORREGIR_DER = ["I","R", "CI", "CD"]
-ESTADO_PRE_C_IZQ, ESTADO_PRE_C_DER, ESTADO_RECONOCIMIENTO, ESTADO_POST_RECON = ["P_CI", "P_CD", "REC", "POST-REC"]
+ESTADO_RECONOCIMIENTO, ESTADO_POST_RECON = [ "REC", "POST-REC"]
 ESTADO_FIND_PIZQ_AVANZA, ESTADO_FIND_PIZQ_GIRO, ESTADO_POST_FPIZQ_AV, ESTADO_POST_FPIZQ_GI,  = ["FP-IZQ-A", "FP-IZQ-G", "POST-FP-IZQ-A", "POST-FP-IZQ-G"]
 ESTADO_GIRO_DER = ["GD"]
 #ACCIONES
-A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP = ["avanza", "gizq", "gder", "atras", "stop"]
+A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP, A_MOV_IZQ, A_MOV_DER = ["avanza", "gizq", "gder", "atras", "stop", "mder", "mizq"]
 # Lista de acciones segun el ciclo de reconocimiento
 LISTA_A_RECONOCIMIENTO = [A_STOP, A_GIRO_IZQ, A_GIRO_IZQ, A_GIRO_DER, A_GIRO_DER,
  A_GIRO_DER, A_GIRO_DER, A_GIRO_IZQ, A_GIRO_IZQ]
@@ -75,19 +75,11 @@ def accionSegunEstado(estado):
     if estado == ESTADO_AVANZAR:
         ordenDeMoviviento(A_AVANZAR)
 
-    elif estado == ESTADO_PRE_C_IZQ:
-        ordenDeMoviviento(A_GIRO_IZQ)
-        time.sleep(0.4)
-
-    elif estado == ESTADO_PRE_C_DER:
-        ordenDeMoviviento(A_GIRO_DER)
-        time.sleep(0.4)
-
     elif estado == ESTADO_CORREGIR_IZQ:
-        ordenDeMoviviento(A_AVANZAR)
+        ordenDeMoviviento(A_MOV_IZQ)
 
     elif estado == ESTADO_CORREGIR_DER:
-        ordenDeMoviviento(A_AVANZAR)
+        ordenDeMoviviento(A_MOV_DER)
 
     elif estado == ESTADO_INDETERMINADO:
         ordenDeMoviviento(A_STOP)
@@ -145,6 +137,9 @@ def cambiarDeEstado(estado, lista_estados_pared):
     estado_pared_cen = lista_estados_pared[1]
     estado_pared_der = lista_estados_pared[2]
 
+    #----------CAMBIOS DE ESTADO SEGUN PARED DER----------
+    if estado_pared_der == INFERIOR_AL_LIMITE:
+        return ESTADO_CORREGIR_IZQ
     # ---------CAMBIOS DE ESTADO SEGUN PARED CEN----------
     if estado_pared_cen == INFERIOR_AL_LIMITE:
         if (estado == ESTADO_AVANZAR or
@@ -168,39 +163,28 @@ def cambiarDeEstado(estado, lista_estados_pared):
 
     elif estado == ESTADO_AVANZAR:
         if estado_pared_izq == INFERIOR_AL_LIMITE:
-            return ESTADO_PRE_C_DER
+            return ESTADO_CORREGIR_DER
         elif estado_pared_izq == SUPERIOR_AL_LIMITE:
-            return ESTADO_PRE_C_IZQ
+            return ESTADO_CORREGIR_IZQ
 
-    elif estado == ESTADO_PRE_C_IZQ:
-        return ESTADO_CORREGIR_IZQ
-
-    elif estado == ESTADO_PRE_C_DER:
-        return ESTADO_CORREGIR_DER
 
     elif estado == ESTADO_CORREGIR_IZQ:
         if estado_pared_izq == CENTRADO_ENTRE_LIMITES:
             return ESTADO_AVANZAR
         elif estado_pared_izq == INFERIOR_AL_LIMITE:
-            return ESTADO_PRE_C_DER
-        elif contador_ciclos_correcion >= maximo_cont_correcionIZQ:
-            contador_ciclos_correcion = 0
-            return ESTADO_PRE_C_IZQ
+            return ESTADO_CORREGIR_DER
 
     elif estado == ESTADO_CORREGIR_DER:
         if estado_pared_izq == CENTRADO_ENTRE_LIMITES:
             return ESTADO_AVANZAR
         elif estado_pared_izq == SUPERIOR_AL_LIMITE:
-            return ESTADO_PRE_C_IZQ
-        elif contador_ciclos_correcion >= maximo_cont_correcionDER:
-            contador_ciclos_correcion = 0
-            return ESTADO_PRE_C_DER
+            return ESTADO_CORREGIR_IZQ
     
     elif estado == ESTADO_INDETERMINADO:
         if estado_pared_izq == INFERIOR_AL_LIMITE:
-            return ESTADO_PRE_C_DER
+            return ESTADO_CORREGIR_DER
         elif estado_pared_izq == SUPERIOR_AL_LIMITE:
-            return ESTADO_PRE_C_IZQ
+            return ESTADO_CORREGIR_IZQ
         elif estado_pared_izq == CENTRADO_ENTRE_LIMITES:
             return ESTADO_AVANZAR
 
@@ -232,12 +216,12 @@ def cambiarDeEstado(estado, lista_estados_pared):
 
     elif estado == ESTADO_FIND_PIZQ_AVANZA:
         if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
-                return ESTADO_RECONOCIMIENTO 
+            return ESTADO_RECONOCIMIENTO 
         return ESTADO_POST_FPIZQ_AV
 
     elif estado == ESTADO_FIND_PIZQ_GIRO:
         if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
-                return ESTADO_FIND_PIZQ_AVANZA
+            return ESTADO_FIND_PIZQ_AVANZA
         return ESTADO_POST_FPIZQ_GI
 
     elif estado == ESTADO_POST_FPIZQ_AV:

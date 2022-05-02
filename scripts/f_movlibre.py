@@ -5,7 +5,7 @@ from std_msgs.msg import String
 import time
 
 pub = rospy.Publisher('orden_mov', String, queue_size=10)
-rospy.init_node('mov_libre', anonymous=False)
+rospy.init_node('mov_libre', anonymous=True)
 rate = rospy.Rate(1) # 10hz
 
 def main():
