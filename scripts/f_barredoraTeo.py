@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from ast import Return
 from this import d
 import rospy
 from std_msgs.msg import String
@@ -14,32 +15,30 @@ UltrSoni2 = Int16MultiArray()
 UltrSoni2.data = []
 data = []
 
-#Limites de distanciacon las paredes
-limites_inf = [15,20,5]
-limites_sup = [90,25]
-MAX_LIMITE_EXTREMO = 40
 #Contador de ciclos que lleva corrigiendo
-contador_ciclos_correcion = 0
 contador_ciclos_reconocimiento = 0
-# Otras variables
-desplazamiento_final = False
-ladoInicial = 1
-ladoContrario = 1
-timer_start = 0
-timer_distancia = 0
 # Convenciones para CONSTANTES
 IZQ, CEN, DER = [0,1,2]
 INDETERMINADO, INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE, EXTREMO_LEJANO_AL_LIMITE = [-99,-1,0,1, 99]
 #LISTADO DE ESTADOS
 ESTADO_INDETERMINADO, ESTADO_AVANZAR, ESTADO_CORREGIR_IZQ, ESTADO_CORREGIR_DER = ["I","R", "CI", "CD"]
-ESTADO_PRE_C_IZQ, ESTADO_PRE_C_DER, ESTADO_RECONOCIMIENTO, ESTADO_POST_RECON = ["P_CI", "P_CD", "REC", "POST-REC"]
-ESTADO_DISM_VEL, ESTADO_DES_LATERAL, ESTADO_ATRAS = ["DV", "DL", "A"]
+ESTADO_RECONOCIMIENTO = "REC"
+ESTADO_DES_LATERAL, ESTADO_ATRAS = ["DL", "A"]
+ESTADO_PRE_GIRO, ESTADO_GIRO_DER, ESTADO_EMPUJAR, ESTADO_GIRO_BOLAS = ["PG", "GD", "E", "GB"]
 #ACCIONES
 A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP = ["avanza", "gizq", "gder", "atras", "stop"]
 A_DESPL_IZQ, A_DESPL_DER = ["mizq", "mder"]
 # Lista de acciones segun el ciclo de reconocimiento
 LISTA_A_RECONOCIMIENTO = [A_STOP, A_GIRO_IZQ, A_GIRO_IZQ, A_GIRO_DER, A_GIRO_DER,
  A_GIRO_DER, A_GIRO_DER, A_GIRO_IZQ, A_GIRO_IZQ, A_AVANZAR]
+
+#variables
+dist_pared_inicial = INDETERMINADO
+isOrigenAvanzar = True
+#Limites de distanciacon las paredes
+limites_inf = [15,20,15] #FIXME
+limites_sup = []
+MAX_LIMITE_EXTREMO = 80
 
 def ordenDeMoviviento(movimiento_str):
     pub.publish(movimiento_str)
@@ -52,117 +51,162 @@ def subsUltrasonidos(array_data):
     data = UltrSoni2.data
     #rospy.loginfo(rospy.get_caller_id()+" UltrSoni2 He recibido datos" + str(UltrSoni2.data[0]))
 
-def getDistanciaInicialRobotRespectoPared(data_fija):
-    global ladoInicial
-    global ladoContrario
+def getEstadoDeRobotConPared(data_fija, PARED):
+    global MAX_LIMITE_EXTREMO
 
     if len(data_fija):
-        if data_fija[IZQ] > data_fija[DER]:
-            ladoInicial = DER
-            ladoContrario = IZQ
-            return data_fija[DER]
-        elif data_fija[DER] > data_fija[IZQ]:
-            ladoInicial = IZQ
-            ladoContrario = DER
-            return data_fija[IZQ]
+        if data_fija[PARED] >= MAX_LIMITE_EXTREMO:
+            return EXTREMO_LEJANO_AL_LIMITE
+        elif data_fija[PARED] < limites_inf[PARED]:
+            return INFERIOR_AL_LIMITE
+        elif data_fija[PARED] > limites_sup[PARED]:
+            return SUPERIOR_AL_LIMITE
         else:
-            print("LAS DOS DISTANCIAS SON IGUALES, TONTO")
-            return INDETERMINADO
+            return CENTRADO_ENTRE_LIMITES
+            
     else:
-        print("NO HAY DATOS, TONTO x2")
         return INDETERMINADO
 
-def accionSegunEstado(estado, dist_pared_lateral_mas_cercana, data_fija):
-    global desplazamiento_final
+def accionSegunEstado(estado):
+    global contador_ciclos_reconocimiento
 
-    if estado == ESTADO_AVANZAR:
+    if estado == ESTADO_INDETERMINADO:
+        ordenDeMoviviento(A_STOP)
+
+    elif estado == ESTADO_AVANZAR:
         ordenDeMoviviento(A_AVANZAR)
 
-    elif estado == ESTADO_INDETERMINADO:
-        if dist_pared_lateral_mas_cercana == INDETERMINADO or desplazamiento_final == True:
-            ordenDeMoviviento(A_STOP)
+    elif estado == ESTADO_CORREGIR_IZQ:
+        ordenDeMoviviento(A_DESPL_IZQ)
 
-    elif estado == ESTADO_ATRAS:
-        desplazamiento_final = False
-        ordenDeMoviviento(A_ATRAS)
-        time.sleep(timer_distancia)
+    elif estado == ESTADO_CORREGIR_DER:
+        ordenDeMoviviento(A_DESPL_DER)
 
     elif estado == ESTADO_DES_LATERAL:
-        if desplazamiento_final:
-            #moverse hacia el lado por el que empezamos la prueba
-            if ladoInicial == IZQ:
-                ordenDeMoviviento(A_DESPL_IZQ)
-            elif ladoInicial == DER:
-                ordenDeMoviviento(A_DESPL_DER)
-        else:
-            # moverse hacia el lado contrario
-            desplazamiento_final = True
-            if ladoContrario == IZQ:
-                ordenDeMoviviento(A_DESPL_IZQ)
-            elif ladoContrario == DER:
-                ordenDeMoviviento(A_DESPL_DER)
+        ordenDeMoviviento(A_DESPL_IZQ)  
+
+    elif estado == ESTADO_PRE_GIRO:
+        ordenDeMoviviento(A_AVANZAR)
     
-    elif estado == ESTADO_DISM_VEL:
-        # TODO cambiar velocidad
-        pass
+    elif estado == ESTADO_GIRO_DER:
+        ordenDeMoviviento(A_GIRO_DER)
+        time.sleep(1.7)
+    
+    elif estado == ESTADO_EMPUJAR:
+        ordenDeMoviviento(A_AVANZAR)
+
+    elif estado == ESTADO_ATRAS:
+        ordenDeMoviviento(A_ATRAS)
+
+    elif estado == ESTADO_GIRO_BOLAS:
+        ordenDeMoviviento(A_GIRO_DER)
+
+    elif estado == ESTADO_RECONOCIMIENTO:
+        ordenRec = LISTA_A_RECONOCIMIENTO[contador_ciclos_reconocimiento]
+        ordenDeMoviviento(ordenRec)
+        time.sleep(0.5)
+        ordenDeMoviviento(A_STOP)
+        time.sleep(0.2)
 
     else:
         ordenDeMoviviento(A_STOP)
 
-def cambiarDeEstado(estado, dist_pared_lateral_mas_cercana, data_fija):
-    global timer_start, timer_distancia, desplazamiento_final
+def cambiarDeEstado(estado, data_fija):
+    global dist_pared_inicial, isOrigenAvanzar
+    global contador_ciclos_reconocimiento
 
-    if estado == ESTADO_AVANZAR:
-        if data_fija[CEN] < limites_sup[CEN] and data_fija[CEN] > limites_inf[CEN]:
-            return ESTADO_DISM_VEL
-    
-    elif estado == ESTADO_INDETERMINADO:
-        print("JAJA", dist_pared_lateral_mas_cercana, "    ----  JEJE", desplazamiento_final)
-        if dist_pared_lateral_mas_cercana == INDETERMINADO or desplazamiento_final == True:
+    estado_izq = getEstadoDeRobotConPared(data_fija, IZQ)
+    estado_cen = getEstadoDeRobotConPared(data_fija, CEN)
+    print("ESTADO IZQ: ", estado_izq, "\tESTADO CEN: ", estado_cen)
+
+    if estado == ESTADO_INDETERMINADO:
+        print("JAJA", dist_pared_inicial, "    ----  JEJE")
+        if dist_pared_inicial == INDETERMINADO:
             return ESTADO_INDETERMINADO
         else:
-            timer_start = time.time()
             return ESTADO_AVANZAR
 
-    elif estado == ESTADO_ATRAS:
-        timer_distancia = timer_start - time.time()
-        desplazamiento_final = False
-        return ESTADO_DES_LATERAL
+    elif estado == ESTADO_AVANZAR:
+        isOrigenAvanzar = True
+        if estado_cen == CENTRADO_ENTRE_LIMITES:
+            return ESTADO_DES_LATERAL
+        elif estado_izq == INFERIOR_AL_LIMITE:
+            return ESTADO_CORREGIR_DER
+        elif estado_izq == SUPERIOR_AL_LIMITE:
+            return ESTADO_CORREGIR_IZQ
+
+    elif estado == ESTADO_CORREGIR_IZQ:
+        if estado_izq == CENTRADO_ENTRE_LIMITES:
+            if isOrigenAvanzar:
+                return ESTADO_AVANZAR
+            else:
+                return ESTADO_EMPUJAR
+        elif estado_izq == INFERIOR_AL_LIMITE:
+            return ESTADO_CORREGIR_DER
+    
+    elif estado == ESTADO_CORREGIR_DER:
+        if estado_izq == CENTRADO_ENTRE_LIMITES:
+            if isOrigenAvanzar:
+                return ESTADO_AVANZAR
+            else:
+                return ESTADO_EMPUJAR
+        elif estado_izq == SUPERIOR_AL_LIMITE:
+            return ESTADO_CORREGIR_IZQ
 
     elif estado == ESTADO_DES_LATERAL:
-        if desplazamiento_final and data_fija[ladoInicial] <= INFERIOR_AL_LIMITE:
-            return ESTADO_INDETERMINADO
-        elif not desplazamiento_final and data_fija[ladoContrario] <= dist_pared_lateral_mas_cercana:
-            desplazamiento_final = True
-            return ESTADO_AVANZAR
+        if estado_izq == INFERIOR_AL_LIMITE:
+            return ESTADO_PRE_GIRO
+
+    elif estado == ESTADO_PRE_GIRO:
+        if estado_cen == INFERIOR_AL_LIMITE:
+            return ESTADO_GIRO_DER
+        
+    elif estado == ESTADO_GIRO_DER:
+            return ESTADO_EMPUJAR
     
-    elif estado == ESTADO_DISM_VEL:
-        if data_fija[CEN] == INFERIOR_AL_LIMITE:
-            if desplazamiento_final:
-                return ESTADO_DES_LATERAL
-            else: 
-                return ESTADO_ATRAS
+    elif estado == ESTADO_EMPUJAR:
+        isOrigenAvanzar = False
+        if estado_cen == INFERIOR_AL_LIMITE:
+            return ESTADO_ATRAS
+        elif estado_izq == INFERIOR_AL_LIMITE:
+            return ESTADO_CORREGIR_DER
+        elif estado_izq == SUPERIOR_AL_LIMITE:
+            return ESTADO_CORREGIR_IZQ
+
+    elif estado == ESTADO_ATRAS:
+        if estado_cen == SUPERIOR_AL_LIMITE:
+            return ESTADO_GIRO_BOLAS
+        # FIXME de momento innecesario
+        elif estado_cen == MAX_LIMITE_EXTREMO:
+            return ESTADO_EMPUJAR
+    
+    elif estado == ESTADO_GIRO_BOLAS:
+        # FIXME ver si poner sleeps o dejarlo asi
+        if estado_cen == SUPERIOR_AL_LIMITE and estado_izq == CENTRADO_ENTRE_LIMITES:
+            return ESTADO_AVANZAR
 
     return estado
-
 
 
 def main():
     #Se declara el subscriber de los ultrasonidos
     rospy.Subscriber('Ultrasonidos_data', Int16MultiArray, subsUltrasonidos)
     # Estado en el que se encuentra el robot
-    estado = ESTADO_INDETERMINADO
-    dist_pared_lateral_mas_cercana = INDETERMINADO   
-    global data 
-    print("AAAAAAAAAAAAAAAAAAAA", "\n"*10)
-    while dist_pared_lateral_mas_cercana == INDETERMINADO:
-        data_fija = data
-        print("DAFIJA: ", data_fija)
-        dist_pared_lateral_mas_cercana = getDistanciaInicialRobotRespectoPared(data_fija)
+    estado = ESTADO_INDETERMINADO 
 
+    global data, dist_pared_inicial
+    global limites_sup
+    
+    while dist_pared_inicial == INDETERMINADO:
+        if len(data):
+            data_fija = data
+            print("DAFIJA: ", data_fija)
+            dist_pared_inicial = data_fija[IZQ]
+
+    limites_sup = [dist_pared_inicial + 10, 40, dist_pared_inicial + 10]
+    print("\n\n------------------LIMITE SUPERIOR: ", limites_sup)
     #Entra al bucle de ROS
-    while not rospy.is_shutdown():
-        
+    while not rospy.is_shutdown():       
         
         ######################
         ### AQUI EL CODIGO ###
@@ -170,12 +214,10 @@ def main():
 
         data_fija = data
 
-        
-
         #Accion segun estado
-        accionSegunEstado(estado, dist_pared_lateral_mas_cercana, data_fija)
+        accionSegunEstado(estado)
         # cambio de estado
-        estado = cambiarDeEstado(estado, dist_pared_lateral_mas_cercana, data_fija)
+        estado = cambiarDeEstado(estado, data_fija)
 
         print("ESTADO ACTUAL: ", estado)
 
