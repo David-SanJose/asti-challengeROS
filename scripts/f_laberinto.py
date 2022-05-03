@@ -22,8 +22,9 @@ limites_inf = [15,20, 8]
 limites_sup = [25]
 MAX_LIMITE_EXTREMO = 40
 #Contador de ciclos que lleva corrigiendo
-contador_ciclos_correcion = 0
+
 contador_ciclos_reconocimiento = 0
+contador_ciclos_find_pizq_avanza = 0
 # Convenciones para CONSTANTES
 IZQ, CEN, DER = [0,1,2]
 INDETERMINADO, INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE, EXTREMO_LEJANO_AL_LIMITE = [-99,-1,0,1, 99]
@@ -31,7 +32,7 @@ INDETERMINADO, INFERIOR_AL_LIMITE, CENTRADO_ENTRE_LIMITES, SUPERIOR_AL_LIMITE, E
 ESTADO_INDETERMINADO, ESTADO_AVANZAR, ESTADO_CORREGIR_IZQ, ESTADO_CORREGIR_DER = ["I","R", "CI", "CD"]
 ESTADO_RECONOCIMIENTO, ESTADO_POST_RECON = [ "REC", "POST-REC"]
 ESTADO_FIND_PIZQ_AVANZA, ESTADO_FIND_PIZQ_GIRO, ESTADO_POST_FPIZQ_AV, ESTADO_POST_FPIZQ_GI,  = ["FP-IZQ-A", "FP-IZQ-G", "POST-FP-IZQ-A", "POST-FP-IZQ-G"]
-ESTADO_GIRO_DER = ["GD"]
+ESTADO_FIND_PIZQ_MARCHA_ATRAS, ESTADO_GIRO_DER = ["FP-IZQ-MA","GD"]
 #ACCIONES
 A_AVANZAR, A_GIRO_IZQ, A_GIRO_DER, A_ATRAS, A_STOP, A_MOV_IZQ, A_MOV_DER = ["avanza", "gizq", "gder", "atras", "stop", "mizq", "mder"]
 # Lista de acciones segun el ciclo de reconocimiento
@@ -96,9 +97,7 @@ def accionSegunEstado(estado):
 
     elif estado == ESTADO_FIND_PIZQ_AVANZA:
         ordenDeMoviviento(A_AVANZAR)
-        time.sleep(2)
-        ordenDeMoviviento(A_STOP)
-        time.sleep(0.3)
+        time.sleep(0.1)
 
     elif estado == ESTADO_FIND_PIZQ_GIRO:
         ordenDeMoviviento(A_GIRO_IZQ)
@@ -112,6 +111,10 @@ def accionSegunEstado(estado):
     
     elif estado == ESTADO_POST_FPIZQ_GI:
         ordenDeMoviviento(A_STOP)
+        time.sleep(0.1)
+
+    elif estado == ESTADO_FIND_PIZQ_MARCHA_ATRAS:
+        ordenDeMoviviento(A_ATRAS)
         time.sleep(0.1)
 
     elif estado == ESTADO_GIRO_DER:
@@ -128,10 +131,8 @@ def accionSegunEstado(estado):
     
 
 def cambiarDeEstado(estado, lista_estados_pared):
-    global contador_ciclos_correcion
     global contador_ciclos_reconocimiento
-    maximo_cont_correcionIZQ = 20
-    maximo_cont_correcionDER = 10
+    global contador_ciclos_find_pizq_avanza
 
     estado_pared_izq = lista_estados_pared[0]
     estado_pared_cen = lista_estados_pared[1]
@@ -158,6 +159,8 @@ def cambiarDeEstado(estado, lista_estados_pared):
         estado != ESTADO_FIND_PIZQ_GIRO and 
         estado != ESTADO_POST_FPIZQ_AV and
         estado != ESTADO_POST_FPIZQ_GI and
+        estado != ESTADO_FIND_PIZQ_MARCHA_ATRAS and
+
         estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE): #EN CASO DE ALEJARSE MUCHO, ENTRA EN RECONOCIMIENTO
         return ESTADO_RECONOCIMIENTO
 
@@ -215,14 +218,30 @@ def cambiarDeEstado(estado, lista_estados_pared):
                 return ESTADO_RECONOCIMIENTO
 
     elif estado == ESTADO_FIND_PIZQ_AVANZA:
-        if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
-            return ESTADO_RECONOCIMIENTO 
-        return ESTADO_POST_FPIZQ_AV
+        print("Contador:", contador_ciclos_find_pizq_avanza)
+        max_ciclos_avance = 20
+        if contador_ciclos_find_pizq_avanza >= max_ciclos_avance:
+            contador_ciclos_find_pizq_avanza = 0
+            if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
+                return ESTADO_RECONOCIMIENTO 
+            else:
+                return ESTADO_POST_FPIZQ_AV
+        elif estado_pared_der == INFERIOR_AL_LIMITE:
+            return ESTADO_CORREGIR_IZQ
+        elif estado_pared_cen == INFERIOR_AL_LIMITE:
+            return ESTADO_FIND_PIZQ_MARCHA_ATRAS
+        return estado
 
     elif estado == ESTADO_FIND_PIZQ_GIRO:
         if estado_pared_izq == EXTREMO_LEJANO_AL_LIMITE:
             return ESTADO_FIND_PIZQ_AVANZA
         return ESTADO_POST_FPIZQ_GI
+
+    elif estado == ESTADO_FIND_PIZQ_MARCHA_ATRAS:
+        if estado_pared_cen == INFERIOR_AL_LIMITE:
+            return estado
+        contador_ciclos_find_pizq_avanza = 0
+        return ESTADO_FIND_PIZQ_GIRO
 
     elif estado == ESTADO_POST_FPIZQ_AV:
         if estado_pared_izq is not EXTREMO_LEJANO_AL_LIMITE:
@@ -244,14 +263,15 @@ def main():
     #Se declara el subscriber de los ultrasonidos
     rospy.Subscriber('Ultrasonidos_data', Int16MultiArray, subsUltrasonidos)
     # Estado en el que se encuentra el robot
-    estadoAnt = ESTADO_INDETERMINADO
+    global contador_ciclos_find_pizq_avanza
     estado = ESTADO_INDETERMINADO
+
+
     
     
     #Entra al bucle de ROS
     while not rospy.is_shutdown():
         global data
-        global contador_ciclos_correcion
         
         
         ######################
@@ -270,11 +290,10 @@ def main():
         # cambio de estado
         estado = cambiarDeEstado(estado, [dist_estado_izq, dist_estado_cen, dist_estado_der])
 
-        #Incrementar numero de ciclos que lleva corrigiendo a la IZQ el robot
-        if estado == ESTADO_CORREGIR_IZQ or estado == ESTADO_CORREGIR_DER:
-            contador_ciclos_correcion += 1
+        if estado == ESTADO_FIND_PIZQ_AVANZA:
+            contador_ciclos_find_pizq_avanza += 1
         else:
-            contador_ciclos_correcion = 0
+            contador_ciclos_find_pizq_avanza = 0
 
         try:
             print("ESTADO ACTUAL: ", estado, "   --- DIST: ", data_fija[IZQ])
